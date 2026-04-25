@@ -57,7 +57,6 @@ if (DATABASE_URL) {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                '--single-process', // Ahorra muchísima RAM en Render
                 '--disable-gpu'
             ]
         }
