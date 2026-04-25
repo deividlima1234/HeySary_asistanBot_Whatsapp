@@ -58,6 +58,8 @@ if (DATABASE_URL) {
             dataPath: './', // Fix: wwebjs-postgres hardcodea la búsqueda de RemoteAuth.zip en el directorio actual
             backupSyncIntervalMs: 300000 // Respaldo cada 5 min
         }),
+        webVersionCache: { type: 'none' }, // Evita que WhatsApp recargue la página buscando actualizaciones (Evita Execution Context Destroyed)
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', // Evitar detecciones de Headless
         puppeteer: {
             // Render necesita executablePath si instalamos chromium por Docker
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
