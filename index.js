@@ -15,6 +15,17 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('🔥 UNHANDLED REJECTION 🔥:', reason);
 });
 
+// Forzar la liberación de memoria cada 10 segundos
+setInterval(() => {
+    if (global.gc) {
+        try {
+            global.gc();
+        } catch (e) {
+            console.error("GC Error:", e);
+        }
+    }
+}, 10000);
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -57,7 +68,10 @@ if (DATABASE_URL) {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                '--disable-gpu'
+                '--disable-gpu',
+                '--disable-software-rasterizer',
+                '--mute-audio',
+                '--js-flags="--max-old-space-size=200"'
             ]
         }
     });
