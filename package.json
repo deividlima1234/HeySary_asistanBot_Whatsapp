@@ -1,0 +1,19 @@
+{
+  "name": "heysary-whatsapp-gateway",
+  "version": "1.0.0",
+  "description": "Gateway para enviar mensajes a WhatsApp Web desde el asistente HeySary",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "pg": "^8.20.0",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.23.0",
+    "wwebjs-postgres": "^1.0.0"
+  }
+}
