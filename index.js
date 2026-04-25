@@ -4,7 +4,8 @@ const cors = require('cors');
 const { Client, RemoteAuth, LocalAuth } = require('whatsapp-web.js');
 const { PostgresStore } = require('wwebjs-postgres');
 const { Pool } = require('pg');
-const qrcode = require('qrcode-terminal');
+const qrcodeTerminal = require('qrcode-terminal');
+const QRCode = require('qrcode');
 
 const app = express();
 app.use(cors());
@@ -19,6 +20,8 @@ const DATABASE_URL = process.env.DATABASE_URL;
 // Estado del cliente
 let isReady = false;
 let client;
+let currentQrBase64 = null;
+let currentStatus = 'STARTING'; // STARTING, WAITING_QR, CONNECTED, DISCONNECTED
 
 if (DATABASE_URL) {
     // Modo Nube (Render + Postgres)
@@ -57,20 +60,30 @@ if (DATABASE_URL) {
     });
 }
 
-client.on('qr', (qr) => {
-    // Genera el código QR en la terminal
-    qrcode.generate(qr, { small: true });
-    console.log('Escanea el código QR con tu aplicación de WhatsApp.');
+client.on('qr', async (qr) => {
+    currentStatus = 'WAITING_QR';
+    try {
+        currentQrBase64 = await QRCode.toDataURL(qr);
+    } catch (err) {
+        console.error('Error generando QR Base64', err);
+    }
+    // Genera el código QR en la terminal por debuging extra
+    qrcodeTerminal.generate(qr, { small: true });
+    console.log('Escanea el código QR con tu aplicación HeySary o en terminal.');
 });
 
 client.on('ready', () => {
     console.log('Cliente de WhatsApp está listo!');
     isReady = true;
+    currentStatus = 'CONNECTED';
+    currentQrBase64 = null; // Borrar de memoria por seguridad al logearse
 });
 
 client.on('disconnected', (reason) => {
     console.log('Cliente desconectado: ', reason);
     isReady = false;
+    currentStatus = 'DISCONNECTED';
+    currentQrBase64 = null;
 });
 
 client.initialize();
@@ -90,12 +103,47 @@ const authMiddleware = (req, res, next) => {
     next();
 };
 
-// Endpoint: Estado del servidor (No requiere token para que el asistente pueda verificar rápido)
+// Endpoint: Estado del servidor genérico
 app.get('/api/status', (req, res) => {
     res.json({
         server: 'online',
         whatsapp_ready: isReady
     });
+});
+
+// Endpoint: Obtener QR visual e información detallada de estado (Protegido)
+app.get('/api/whatsapp/status', authMiddleware, (req, res) => {
+    res.json({
+        state: currentStatus,
+        isReady: isReady,
+        qrCodeBase64: currentQrBase64 
+    });
+});
+
+// Endpoint: Cerrar y destruir sesión activa / Revocar sesión (Protegido)
+app.post('/api/whatsapp/logout', authMiddleware, async (req, res) => {
+    if (!isReady && currentStatus !== 'CONNECTED') {
+        return res.status(400).json({ error: 'No hay ninguna sesión de WhatsApp activa para revocar.' });
+    }
+    try {
+        console.log("Cerrando sesión de WhatsApp solicitada por usuario...");
+        await client.logout();
+        isReady = false;
+        currentStatus = 'DISCONNECTED';
+        currentQrBase64 = null;
+        res.json({ success: true, message: 'Sesión revocada exitosamente.' });
+        
+        // Normalmente cliente.initialize() se debe llamar de nuevo si queremos que ofrezca QR automáticamente tras logout.
+        // Esperamos un segundo y forzamos reinicio:
+        setTimeout(() => {
+            console.log("Reiniciando cliente generador de QR...");
+            client.initialize().catch(e => console.error(e));
+        }, 2000);
+
+    } catch (e) {
+        console.error("Error cerrando sesión remota: ", e);
+        res.status(500).json({ error: 'Error del servidor al cerrar sesión' });
+    }
 });
 
 // Endpoint: Enviar Mensaje
