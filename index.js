@@ -7,6 +7,14 @@ const { Pool } = require('pg');
 const qrcodeTerminal = require('qrcode-terminal');
 const QRCode = require('qrcode');
 
+// Capturar cualquier error para que no tire el servidor silenciosamente
+process.on('uncaughtException', (err) => {
+    console.error('🔥 UNCAUGHT EXCEPTION 🔥:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('🔥 UNHANDLED REJECTION 🔥:', reason);
+});
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -42,7 +50,16 @@ if (DATABASE_URL) {
         puppeteer: {
             // Render necesita executablePath si instalamos chromium por Docker
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+            args: [
+                '--no-sandbox', 
+                '--disable-setuid-sandbox', 
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--single-process', // Ahorra muchísima RAM en Render
+                '--disable-gpu'
+            ]
         }
     });
 
