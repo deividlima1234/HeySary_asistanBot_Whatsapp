@@ -55,7 +55,7 @@ async function connectToWhatsApp() {
 
     sock = makeWASocket({
         version,
-        logger: pino({ level: 'silent' }), // Evita prints masivos innecesarios de Baileys
+        logger: pino({ level: 'info' }), // Habilitado para diagnosticar el stream error
         printQRInTerminal: true,
         auth: state,
         generateHighQualityLinkPreview: true,
@@ -136,6 +136,7 @@ app.post('/api/whatsapp/send', authMiddleware, async (req, res) => {
 
 app.get('/api/whatsapp/status', authMiddleware, (req, res) => {
     res.json({
+        state: currentStatus, // Android App espera 'state' explícitamente
         status: currentStatus,
         qrCodeBase64: currentQrBase64
     });
