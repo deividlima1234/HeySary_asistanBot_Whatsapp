@@ -36,6 +36,7 @@ if (DATABASE_URL) {
     client = new Client({
         authStrategy: new RemoteAuth({
             store: store,
+            dataPath: './', // Fix: wwebjs-postgres hardcodea la búsqueda de RemoteAuth.zip en el directorio actual
             backupSyncIntervalMs: 300000 // Respaldo cada 5 min
         }),
         puppeteer: {
