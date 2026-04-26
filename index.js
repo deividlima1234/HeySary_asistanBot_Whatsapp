@@ -140,7 +140,21 @@ app.post(['/api/whatsapp/send', '/api/messages/send'], authMiddleware, async (re
             return res.status(400).json({ error: "El numero no existe en WhatsApp" });
         }
 
-        await sock.sendMessage(result.jid, { text: message });
+        // --- Humanizar Envío ---
+        // 1. Activar estado 'escribiendo'
+        await sock.sendPresenceUpdate('composing', result.jid);
+
+        // 2. Delay dinámico (aprox 100ms por carácter, min 1s, max 4s)
+        const typingDelay = Math.min(Math.max(message.length * 50, 1500), 4000);
+        await new Promise(resolve => setTimeout(resolve, typingDelay));
+
+        // 3. Detener 'escribiendo' y enviar con Marca de Agua
+        await sock.sendPresenceUpdate('paused', result.jid);
+        
+        const watermark = "\n\n— ⚡ SΛRY IПTΞLLIGΞПCΞ // HUD.v2";
+        const finalMessage = message.trim() + watermark;
+
+        await sock.sendMessage(result.jid, { text: finalMessage });
         res.status(200).json({ success: true, message: "Mensaje enviado exitosamente vía Sockets" });
     } catch (e) {
         console.error("Error al enviar mensaje:", e);
