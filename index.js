@@ -34,6 +34,8 @@ const authMiddleware = (req, res, next) => {
 let sock;
 let currentQrBase64 = null;
 let currentStatus = 'STARTING'; // STARTING, WAITING_QR, CONNECTED, DISCONNECTED
+let linkedNumber = null;
+let linkedName = null;
 
 const pool = new Pool({
     connectionString: DATABASE_URL,
@@ -97,7 +99,10 @@ async function connectToWhatsApp() {
                 setTimeout(connectToWhatsApp, 2000);
             }
         } else if (connection === 'open') {
-            console.log('Cliente de WhatsApp está listo! (Vía Baileys Sockets)');
+            const user = sock.user;
+            linkedNumber = user.id.split(':')[0];
+            linkedName = user.name || 'Usuario';
+            console.log(`Cliente de WhatsApp listo: ${linkedName} (${linkedNumber})`);
             currentStatus = 'CONNECTED';
             currentQrBase64 = null;
         }
@@ -145,9 +150,11 @@ app.post(['/api/whatsapp/send', '/api/messages/send'], authMiddleware, async (re
 
 app.get('/api/whatsapp/status', authMiddleware, (req, res) => {
     res.json({
-        state: currentStatus, // Android App espera 'state' explícitamente
+        state: currentStatus, 
         status: currentStatus,
-        qrCodeBase64: currentQrBase64
+        qrCodeBase64: currentQrBase64,
+        phone: linkedNumber,
+        name: linkedName
     });
 });
 
