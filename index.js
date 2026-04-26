@@ -106,10 +106,14 @@ async function connectToWhatsApp() {
 
 connectToWhatsApp();
 
-app.post('/api/whatsapp/send', authMiddleware, async (req, res) => {
-    const { phone, message } = req.body;
+// Soportar ambas rutas (La antigua de WhatsappGatewayClient y la nueva)
+app.post(['/api/whatsapp/send', '/api/messages/send'], authMiddleware, async (req, res) => {
+    // La App Android via WhatsappGatewayClient envía "to", pero nosotros usábamos "phone"
+    const phone = req.body.phone || req.body.to;
+    const message = req.body.message;
+
     if (!phone || !message) {
-        return res.status(400).json({ error: "Missing 'phone' or 'message'" });
+        return res.status(400).json({ error: "Missing 'phone' (or 'to') or 'message'" });
     }
 
     if (currentStatus !== 'CONNECTED' || !sock) {
@@ -118,6 +122,11 @@ app.post('/api/whatsapp/send', authMiddleware, async (req, res) => {
 
     try {
         let cleanPhone = phone.replace(/\D/g, '');
+        // Baileys usa el código de país. Si el número tiene 9 dígitos (Perú), le agregamos el 51
+        if (cleanPhone.length === 9) {
+            cleanPhone = "51" + cleanPhone;
+        }
+
         const jid = `${cleanPhone}@s.whatsapp.net`;
         
         // Comprobar si existe el número
