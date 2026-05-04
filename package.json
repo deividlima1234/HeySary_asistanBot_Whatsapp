@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "node index.js"
+    "dev": "node index.js",
+    "postinstall": "sed -i 's/JSON.parse(a)/(function(s){try{return JSON.parse(s);}catch(e){return s;}})(a)/g' node_modules/@whiskeysockets/baileys/lib/Utils/process-message.js || true"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc.9",
