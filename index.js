@@ -47,6 +47,7 @@ const pool = new Pool({
 // Autopilot State
 let lastPingTime = Date.now();
 let isAutopilotEnabled = false;
+let respondedContactsSession = new Set();
 const AUTOPILOT_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutos
 
 let groqClient = null;
@@ -82,6 +83,7 @@ setInterval(() => {
     if (!isAutopilotEnabled && (Date.now() - lastPingTime > AUTOPILOT_TIMEOUT_MS)) {
         console.log('⏳ Timeout alcanzado (3 min). Entrando en Piloto Automático...');
         isAutopilotEnabled = true;
+        respondedContactsSession.clear();
     }
 }, 10000); // Revisar cada 10 segundos
 
@@ -172,19 +174,28 @@ async function connectToWhatsApp() {
             const contactId = msg.key.remoteJid;
             const contactName = msg.pushName || 'Contacto';
 
-            // Comprobar Cooldown en BD (¿Ya le respondimos mientras estamos offline?)
-            // Buscamos si hay un registro de este contacto desde que entramos en modo offline.
-            // Para simplificar, buscamos si hay ALGÚN registro de este contacto que aún no se ha sincronizado (porque al reconectar borramos la tabla).
+            // Prevenir race condition en memoria (mensajes múltiples en menos de 1 segundo)
+            if (respondedContactsSession.has(contactId)) {
+                await pool.query(
+                    `INSERT INTO offline_logs (contact_id, contact_name, message_received, response_generated) VALUES ($1, $2, $3, $4)`,
+                    [contactId, contactName, textMessage, "[Anotado - En Memoria]"]
+                );
+                return;
+            }
+            
+            // Marcar inmediatamente para evitar reentradas
+            respondedContactsSession.add(contactId);
+
+            // Comprobar Cooldown en BD (por seguridad si reinicia el servidor)
             const recentLog = await pool.query(
                 `SELECT id FROM offline_logs WHERE contact_id = $1 LIMIT 1`, 
                 [contactId]
             );
 
             if (recentLog.rowCount > 0) {
-                // Ya le respondimos. Solo guardamos el mensaje en bitácora silenciosamente.
                 await pool.query(
                     `INSERT INTO offline_logs (contact_id, contact_name, message_received, response_generated) VALUES ($1, $2, $3, $4)`,
-                    [contactId, contactName, textMessage, "[Mensaje Anotado - Sin auto-respuesta por Cooldown]"]
+                    [contactId, contactName, textMessage, "[Anotado - BD Cooldown]"]
                 );
                 return;
             }
@@ -209,11 +220,12 @@ async function connectToWhatsApp() {
                 }
             }
 
-            const finalMessage = responseText + "\\n\\n— Sary 🤖";
+            // Firma elegante, sin iconos, cursiva de WhatsApp y saltos de línea reales
+            const finalMessage = responseText + "\n\n_— Ｓａｒｙ_";
 
-            // Simular tipeo humano
+            // Simular tipeo humano largo (> 5 segundos garantizados)
             await sock.sendPresenceUpdate('composing', contactId);
-            const typingDelay = Math.min(Math.max(finalMessage.length * 50, 2000), 4000);
+            const typingDelay = Math.max(5500, finalMessage.length * 60); // Mínimo 5.5 seg
             await new Promise(resolve => setTimeout(resolve, typingDelay));
             await sock.sendPresenceUpdate('paused', contactId);
 
@@ -247,8 +259,9 @@ app.post('/api/heartbeat', authMiddleware, async (req, res) => {
             const logsRes = await pool.query(`SELECT contact_name, message_received, response_generated, created_at FROM offline_logs ORDER BY created_at ASC`);
             const logs = logsRes.rows;
             
-            // Vaciar bitácora
+            // Vaciar bitácora y sesión
             await pool.query(`DELETE FROM offline_logs`);
+            respondedContactsSession.clear();
             
             return res.json({ 
                 status: 'ONLINE', 
