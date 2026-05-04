@@ -210,7 +210,7 @@ async function connectToWhatsApp() {
                     
                     const chatCompletion = await groqClient.chat.completions.create({
                         messages: [{ role: "system", content: promptText }],
-                        model: "llama3-8b-8192",
+                        model: "llama-3.1-8b-instant",
                         temperature: 0.6,
                         max_tokens: 150,
                     });
