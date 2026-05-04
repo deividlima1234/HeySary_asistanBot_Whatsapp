@@ -155,12 +155,19 @@ async function connectToWhatsApp() {
         if (!isAutopilotEnabled || !sock) return;
 
         try {
+            console.log("[DEBUG-AUTOPILOT] Evento messages.upsert recibido:", JSON.stringify(m, null, 2));
             const msg = m.messages[0];
             // Ignorar si no hay mensaje, si es nuestro, de un grupo, o de estado
-            if (!msg || !msg.message || msg.key.fromMe || msg.key.remoteJid.includes('@g.us') || msg.key.remoteJid === 'status@broadcast') return;
+            if (!msg || !msg.message || msg.key.fromMe || msg.key.remoteJid.includes('@g.us') || msg.key.remoteJid === 'status@broadcast') {
+                console.log("[DEBUG-AUTOPILOT] Mensaje ignorado. (fromMe/grupo/estado/sin-mensaje)");
+                return;
+            }
 
             const textMessage = msg.message.conversation || msg.message.extendedTextMessage?.text;
-            if (!textMessage) return;
+            if (!textMessage) {
+                console.log("[DEBUG-AUTOPILOT] Mensaje no tiene texto. Ignorando.");
+                return;
+            }
 
             const contactId = msg.key.remoteJid;
             const contactName = msg.pushName || 'Contacto';
